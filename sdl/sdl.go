@@ -449,6 +449,8 @@ func (screen *Surface) Unlock() {
 	screen.mutex.Unlock()
 }
 
+// Performs a fast blit from the source surface to the destination surface.
+// This is the same as func BlitSurface, but the order of arguments is reversed.
 func (dst *Surface) Blit(dstrect *Rect, src *Surface, srcrect *Rect) int {
 	GlobalMutex.Lock()
 	global := true
@@ -480,6 +482,11 @@ func (dst *Surface) Blit(dstrect *Rect, src *Surface, srcrect *Rect) int {
 	}
 
 	return int(ret)
+}
+
+// Performs a fast blit from the source surface to the destination surface.
+func BlitSurface(src *Surface, srcrect *Rect, dst *Surface, dstrect *Rect) int {
+	return dst.Blit(dstrect, src, srcrect)
 }
 
 // This function performs a fast fill of the given rectangle with some color.
