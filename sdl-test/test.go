@@ -130,7 +130,7 @@ func main() {
 	white := sdl.Color{255, 255, 255, 0}
 	text := ttf.RenderText_Blended(font, "Test (with music)", white)
 	music := mixer.LoadMUS(resourcePath + "/test.ogg")
-	sound := mixer.LoadWAV("sound.ogg")
+	sound := mixer.LoadWAV(resourcePath + "/sound.ogg")
 
 	if music == nil || sound == nil {
 		log.Fatal(sdl.GetError())
