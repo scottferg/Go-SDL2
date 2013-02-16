@@ -82,6 +82,10 @@ func (c *Chunk) PlayChannel(channel, loops int) int {
 	return int(C.Mix_PlayChannelTimed(C.int(channel), c.cchunk, C.int(loops), -1))
 }
 
+func (c *Chunk) Free() {
+	C.Mix_FreeChunk(c.cchunk)
+}
+
 // Sets the volume to the value specified.
 func VolumeMusic(volume int) int { return int(C.Mix_VolumeMusic(C.int(volume))) }
 
