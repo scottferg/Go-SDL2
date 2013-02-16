@@ -17,6 +17,10 @@ type Music struct {
 	cmusic *C.Mix_Music
 }
 
+type Chunk struct {
+	cchunk *C.Mix_Chunk
+}
+
 // Initializes SDL_mixer.  Return 0 if successful and -1 if there were
 // initialization errors.
 func OpenAudio(frequency int, format uint16, channels, chunksize int) int {
@@ -60,6 +64,22 @@ func (m *Music) FadeInMusic(loops, ms int) int {
 func (m *Music) FadeInMusicPos(loops, ms int, position float64) int {
 	return int(C.Mix_FadeInMusicPos(m.cmusic, C.int(loops), C.int(ms),
 		C.double(position)))
+}
+
+func LoadWAV(file string) *Chunk {
+	cfile := C.CString(file)
+	cchunk := C.Mix_LoadWAV_RW(C.SDL_RWFromFile(cfile, C.CString("rb")), 1)
+	C.free(unsafe.Pointer(cfile))
+
+	if cchunk == nil {
+		return nil
+	}
+
+	return &Chunk{cchunk}
+}
+
+func (c *Chunk) PlayChannel(channel, loops int) int {
+	return int(C.Mix_PlayChannelTimed(C.int(channel), c.cchunk, C.int(loops), -1))
 }
 
 // Sets the volume to the value specified.
