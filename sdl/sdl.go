@@ -7,8 +7,7 @@ flavor (eg. Rather than sdl.Flip(surface) it's surface.Flip() )
 */
 package sdl
 
-// #cgo pkg-config: sdl
-// #cgo LDFLAGS: -lSDL_image
+// #cgo pkg-config: sdl SDL_image
 //
 // struct private_hwdata{};
 // struct SDL_BlitMap{};
@@ -19,7 +18,11 @@ package sdl
 import "C"
 
 import (
+	"os"
+	"reflect"
+	"runtime"
 	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -46,6 +49,8 @@ type Surface struct {
 	Pitch  uint16
 	Pixels unsafe.Pointer
 	Offset int32
+
+	gcPixels interface{} // Prevents garbage collection of pixels passed to func CreateRGBSurfaceFrom
 }
 
 func wrap(cSurface *C.SDL_Surface) *Surface {
@@ -84,6 +89,7 @@ func (s *Surface) destroy() {
 	s.cSurface = nil
 	s.Format = nil
 	s.Pixels = nil
+	s.gcPixels = nil
 }
 
 // =======
@@ -106,6 +112,16 @@ func GoSdlVersion() string {
 func Init(flags uint32) int {
 	GlobalMutex.Lock()
 	status := int(C.SDL_Init(C.Uint32(flags)))
+	if (status != 0) && (runtime.GOOS == "darwin") && (flags&INIT_VIDEO != 0) {
+		if os.Getenv("SDL_VIDEODRIVER") == "" {
+			os.Setenv("SDL_VIDEODRIVER", "x11")
+			status = int(C.SDL_Init(C.Uint32(flags)))
+			if status != 0 {
+				os.Setenv("SDL_VIDEODRIVER", "")
+			}
+		}
+	}
+
 	GlobalMutex.Unlock()
 	return status
 }
@@ -128,6 +144,15 @@ func Quit() {
 func InitSubSystem(flags uint32) int {
 	GlobalMutex.Lock()
 	status := int(C.SDL_InitSubSystem(C.Uint32(flags)))
+	if (status != 0) && (runtime.GOOS == "darwin") && (flags&INIT_VIDEO != 0) {
+		if os.Getenv("SDL_VIDEODRIVER") == "" {
+			os.Setenv("SDL_VIDEODRIVER", "x11")
+			status = int(C.SDL_InitSubSystem(C.Uint32(flags)))
+			if status != 0 {
+				os.Setenv("SDL_VIDEODRIVER", "")
+			}
+		}
+	}
 	GlobalMutex.Unlock()
 	return status
 }
@@ -411,6 +436,8 @@ func (screen *Surface) Unlock() {
 	screen.mutex.Unlock()
 }
 
+// Performs a fast blit from the source surface to the destination surface.
+// This is the same as func BlitSurface, but the order of arguments is reversed.
 func (dst *Surface) Blit(dstrect *Rect, src *Surface, srcrect *Rect) int {
 	GlobalMutex.Lock()
 	global := true
@@ -442,6 +469,11 @@ func (dst *Surface) Blit(dstrect *Rect, src *Surface, srcrect *Rect) int {
 	}
 
 	return int(ret)
+}
+
+// Performs a fast blit from the source surface to the destination surface.
+func BlitSurface(src *Surface, srcrect *Rect, dst *Surface, dstrect *Rect) int {
+	return dst.Blit(dstrect, src, srcrect)
 }
 
 // This function performs a fast fill of the given rectangle with some color.
@@ -522,6 +554,26 @@ func CreateRGBSurface(flags uint32, width int, height int, bpp int, Rmask uint32
 	GlobalMutex.Unlock()
 
 	return wrap(p)
+}
+
+// Creates a Surface from existing pixel data. It expects pixels to be a slice, pointer or unsafe.Pointer.
+func CreateRGBSurfaceFrom(pixels interface{}, width, height, bpp, pitch int, Rmask, Gmask, Bmask, Amask uint32) *Surface {
+	var ptr unsafe.Pointer
+	switch v := reflect.ValueOf(pixels); v.Kind() {
+	case reflect.Ptr, reflect.UnsafePointer, reflect.Slice:
+		ptr = unsafe.Pointer(v.Pointer())
+	default:
+		panic("Don't know how to handle type: " + v.Kind().String())
+	}
+
+	GlobalMutex.Lock()
+	p := C.SDL_CreateRGBSurfaceFrom(ptr, C.int(width), C.int(height), C.int(bpp), C.int(pitch),
+		C.Uint32(Rmask), C.Uint32(Gmask), C.Uint32(Bmask), C.Uint32(Amask))
+	GlobalMutex.Unlock()
+
+	s := wrap(p)
+	s.gcPixels = pixels
+	return s
 }
 
 // Converts a surface to the display format
@@ -802,4 +854,21 @@ func (joystick *Joystick) GetBall(ball int, dx, dy *int) int {
 // to 32767.
 func (joystick *Joystick) GetAxis(axis int) int16 {
 	return int16(C.SDL_JoystickGetAxis(joystick.cJoystick, C.int(axis)))
+}
+
+// ====
+// Time
+// ====
+
+// Gets the number of milliseconds since the SDL library initialization.
+func GetTicks() uint32 {
+	GlobalMutex.Lock()
+	t := uint32(C.SDL_GetTicks())
+	GlobalMutex.Unlock()
+	return t
+}
+
+// Waits a specified number of milliseconds before returning.
+func Delay(ms uint32) {
+	time.Sleep(time.Duration(ms) * time.Millisecond)
 }
