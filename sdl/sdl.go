@@ -1,5 +1,5 @@
 /*
-A binding of SDL and SDL_image.
+A binding of SDL2 and SDL2_image.
 
 The binding works in pretty much the same way as it does in C, although
 some of the functions have been altered to give them an object-oriented

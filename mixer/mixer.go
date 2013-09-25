@@ -1,5 +1,5 @@
 /*
-A binding of SDL_mixer.
+A binding of SDL2_mixer.
 
 The binding works pretty much the same as the original, although a few
 functions have been changed to be in a more object-oriented style

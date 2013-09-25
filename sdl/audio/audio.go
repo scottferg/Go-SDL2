@@ -6,7 +6,7 @@
  */
 
 /*
-An interface to low-level SDL sound functions.
+An interface to low-level SDL2 sound functions.
 */
 package audio
 
