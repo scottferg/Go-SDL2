@@ -1,8 +1,8 @@
 # Introduction
 
-This is an improved version of Banthar's [Go-SDL](http://github.com/banthar/Go-SDL).
+This a fork of [Go-SDL](http://github.com/banthar/Go-SDL) which supports SDL version 2.0.
 
-The improvements/differences are:
+Differences from Banthar's original library are:
 
 * SDL functions (except for SDL-mixer) can be safely called from concurrently
   running goroutines
@@ -10,18 +10,18 @@ The improvements/differences are:
 * Support for low-level SDL sound functions
 
 * Can be installed in parallel to Banthar's Go-SDL
-* The import paths are "github.com/0xe2-0x9a-0x9b/Go-SDL/..."
+* The import paths are "github.com/scottferg/Go-SDL2/..."
 
 
 # Installation
 
-Make sure you have SDL, SDL-image, SDL-mixer and SDL-ttf (all in -dev version).
+Make sure you have SDL2, SDL2-image, SDL2-mixer and SDL2-ttf (all in -dev version).
 
 Installing libraries and examples:
 
-    go get -v github.com/0xe2-0x9a-0x9b/Go-SDL/...
+    go get -v github.com/scottferg/Go-SDL2/sdl
 
 
 # Credits
 
-Music to test SDL-mixer is by Kevin MacLeod.
+Music to test SDL2-mixer is by Kevin MacLeod.
