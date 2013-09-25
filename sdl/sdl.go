@@ -233,6 +233,16 @@ func (r *Renderer) Destroy() {
 // Texture
 // =======
 
+func CreateTexture(r *Renderer, format uint32, access, w, h int) *Texture {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	texture := C.SDL_CreateTexture(r.cRenderer, C.Uint32(format),
+		C.int(access), C.int(w), C.int(h))
+
+	return wrapTexture(texture)
+}
+
 func CreateTextureFromSurface(r *Renderer, s *Surface) *Texture {
 	GlobalMutex.Lock()
 	defer GlobalMutex.Unlock()
@@ -415,6 +425,17 @@ func (w *Window) Destroy() {
 	C.SDL_DestroyWindow(w.cWindow)
 }
 
+func (w *Window) ShowSimpleMessageBox(flags uint32, title, message string) {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	ctitle, cmessage := C.CString(title), C.CString(message)
+	C.SDL_ShowSimpleMessageBox(C.Uint32(flags), ctitle, cmessage, w.cWindow)
+
+	C.free(unsafe.Pointer(ctitle))
+	C.free(unsafe.Pointer(cmessage))
+}
+
 // ======
 // Video
 // ======
@@ -433,6 +454,12 @@ func GetVideoSurface() *Surface {
 func (w *Window) GL_SwapWindow() {
 	GlobalMutex.Lock()
 	C.SDL_GL_SwapWindow(w.cWindow)
+	GlobalMutex.Unlock()
+}
+
+func (w *Window) GL_CreateContext() {
+	GlobalMutex.Lock()
+	C.SDL_GL_CreateContext(w.cWindow)
 	GlobalMutex.Unlock()
 }
 

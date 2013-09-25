@@ -1,7 +1,7 @@
 package mixer
 
-// #cgo pkg-config: SDL_mixer
-// #include <SDL_mixer.h>
+// #cgo pkg-config: SDL2_mixer
+// #include <SDL2/SDL_mixer.h>
 import "C"
 import "unsafe"
 

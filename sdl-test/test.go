@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/scottferg/Go-SDL2/mixer"
 	"github.com/scottferg/Go-SDL2/sdl"
 	"log"
 	"math"
@@ -43,6 +44,11 @@ func main() {
 		log.Fatal(sdl.GetError())
 	}
 
+	if mixer.OpenAudio(mixer.DEFAULT_FREQUENCY, mixer.DEFAULT_FORMAT,
+		mixer.DEFAULT_CHANNELS, 4096) != 0 {
+		log.Fatal(sdl.GetError())
+	}
+
 	var window = sdl.CreateWindow("SDL2 Sample", sdl.WINDOWPOS_UNDEFINED,
 		sdl.WINDOWPOS_UNDEFINED, 640, 480, sdl.WINDOW_SHOWN)
 
@@ -70,7 +76,7 @@ func main() {
 
 	window.SetIcon(image)
 
-	// tex := sdl.CreateTextureFromSurface(rend, image)
+	tex := sdl.CreateTextureFromSurface(rend, image)
 
 	running := true
 
@@ -90,7 +96,10 @@ func main() {
 
 	rend.SetDrawColor(sdl.Color{0x30, 0x20, 0x19, 0xFF, 0x00})
 	rend.FillRect(nil)
+	rend.Copy(tex, nil, nil)
 	rend.Present()
+
+	window.ShowSimpleMessageBox(sdl.MESSAGEBOX_INFORMATION, "Test Message", "SDL2 supports message boxes!")
 
 	for running {
 		select {
@@ -140,7 +149,7 @@ func main() {
 				}
 				println()
 
-				fmt.Printf("Type: %02x Which: %02x State: %02x Pad: %02x\n", e.Type, e.Which, e.State, e.Pad0[0])
+				fmt.Printf("Type: %02x State: %02x Pad: %02x\n", e.Type, e.State, e.Pad0[0])
 				fmt.Printf("Scancode: %02x Sym: %08x Mod: %04x Unicode: %04x\n", e.Keysym.Scancode, e.Keysym.Sym, e.Keysym.Mod, e.Keysym.Unicode)
 
 			case sdl.MouseButtonEvent:
@@ -149,14 +158,13 @@ func main() {
 					in = out
 					out = make(chan Point)
 					go worm(in, out, draw)
-					// sound.PlayChannel(-1, 0)
 				}
 			}
 		}
 	}
 
 	image.Free()
-	// tex.Destroy()
+	tex.Destroy()
 	rend.Destroy()
 	window.Destroy()
 	sdl.Quit()

@@ -70,11 +70,13 @@ type ActiveEvent struct {
 }
 
 type KeyboardEvent struct {
-	Type   uint32
-	Which  uint8
-	State  uint8
-	Pad0   [1]byte
-	Keysym Keysym
+	Type      uint32
+	Timestamp uint32
+	WindowId  uint32
+	State     uint8
+	Repeat    uint8
+	Pad0      [2]byte
+	Keysym    Keysym
 }
 
 type MouseMotionEvent struct {
@@ -89,12 +91,15 @@ type MouseMotionEvent struct {
 }
 
 type MouseButtonEvent struct {
-	Type   uint32
-	Which  uint8
-	Button uint8
-	State  uint8
-	X      uint16
-	Y      uint16
+	Type      uint32
+	Timestamp uint32
+	WindowId  uint32
+	Which     uint8
+	Button    uint8
+	State     uint8
+	Pad0      [2]byte
+	X         int32
+	Y         int32
 }
 
 type JoyAxisEvent struct {

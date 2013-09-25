@@ -10,11 +10,11 @@ An interface to low-level SDL sound functions.
 */
 package audio
 
-// #cgo pkg-config: sdl
+// #cgo pkg-config: sdl2
 // #cgo freebsd LDFLAGS: -lrt
 // #cgo linux LDFLAGS: -lrt
 // #cgo windows LDFLAGS: -lpthread
-// #include <SDL_audio.h>
+// #include <SDL2/SDL_audio.h>
 // #include "callback.h"
 import "C"
 import "unsafe"
@@ -64,10 +64,10 @@ func OpenAudio(desired, obtained_orNil *AudioSpec) int {
 
 	C_desired = new(C.SDL_AudioSpec)
 	C_desired.freq = C.int(desired.Freq)
-	C_desired.format = C.Uint16(desired.Format)
+	C_desired.format = C.SDL_AudioFormat(desired.Format)
 	C_desired.channels = C.Uint8(desired.Channels)
 	C_desired.samples = C.Uint16(desired.Samples)
-	C_desired.callback = C.callback_getCallback()
+	C_desired.callback = C.SDL_AudioCallback(C.callback_getCallback())
 
 	if obtained_orNil != nil {
 		if desired != obtained_orNil {
