@@ -72,6 +72,29 @@ type Texture struct {
 	cTexture *C.SDL_Texture
 }
 
+func ptr(v interface{}) unsafe.Pointer {
+
+	if v == nil {
+		return unsafe.Pointer(nil)
+	}
+
+	rv := reflect.ValueOf(v)
+	var et reflect.Value
+	switch rv.Type().Kind() {
+	case reflect.Uintptr:
+		offset, _ := v.(uintptr)
+		return unsafe.Pointer(offset)
+	case reflect.Ptr:
+		et = rv.Elem()
+	case reflect.Slice:
+		et = rv.Index(0)
+	default:
+		panic("type must be a pointer, a slice, uintptr or nil")
+	}
+
+	return unsafe.Pointer(et.UnsafeAddr())
+}
+
 func wrapSurface(cSurface *C.SDL_Surface) *Surface {
 	var s *Surface
 
@@ -91,7 +114,7 @@ func wrapWindow(cWindow *C.SDL_Window) *Window {
 
 	if cWindow != nil {
 		var window Window
-		window.SetCWindow(unsafe.Pointer(cWindow))
+		w.cWindow = (*C.SDL_Window)(cWindow)
 		w = &window
 	} else {
 		w = nil
@@ -132,25 +155,6 @@ func wrapTexture(cTexture *C.SDL_Texture) *Texture {
 func (s *Surface) SetCSurface(cSurface unsafe.Pointer) {
 	s.cSurface = (*C.SDL_Surface)(cSurface)
 	s.reload()
-}
-
-func (s *Window) SetCWindow(cWindow unsafe.Pointer) {
-	s.cWindow = (*C.SDL_Window)(cWindow)
-	s.reload()
-}
-
-// Pull data from C.SDL_Window.
-// Make sure to use this when the C surface might have been changed.
-//
-// TODO: Incomplete
-func (s *Window) reload() {
-	/*
-		s.Flags = uint32(s.cWindow.flags)
-		s.W = int32(s.cWindow.w)
-		s.H = int32(s.cWindow.h)
-		s.X = int32(s.cWindow.x)
-		s.Y = int32(s.cWindow.y)
-	*/
 }
 
 // Pull data from C.SDL_Surface.
@@ -249,6 +253,13 @@ func CreateTextureFromSurface(r *Renderer, s *Surface) *Texture {
 
 	texture := C.SDL_CreateTextureFromSurface(r.cRenderer, s.cSurface)
 	return wrapTexture(texture)
+}
+
+func (t *Texture) Update(rect *Rect, pixels interface{}, pitch int) {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_UpdateTexture(t.cTexture, (*C.SDL_Rect)(cast(rect)), ptr(pixels), C.int(pitch))
 }
 
 func (t *Texture) Destroy() {
@@ -415,6 +426,13 @@ func (w *Window) SetIcon(s *Surface) {
 	defer GlobalMutex.Unlock()
 
 	C.SDL_SetWindowIcon(w.cWindow, s.cSurface)
+}
+
+func (w *Window) SetFullscreen(flags uint32) {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_SetWindowFullscreen(w.cWindow, C.Uint32(flags))
 }
 
 func (w *Window) Destroy() {
@@ -632,8 +650,26 @@ func CreateRGBSurfaceFrom(pixels interface{}, width, height, bpp, pitch int, Rma
 	return s
 }
 
+// Modifier
+type Mod C.int
+
 // Key
 type Key C.int
+
+// Gets the state of modifier keys
+func GetModState() Mod {
+	GlobalMutex.Lock()
+	state := Mod(C.SDL_GetModState())
+	GlobalMutex.Unlock()
+	return state
+}
+
+// Sets the state of modifier keys
+func SetModState(modstate Mod) {
+	GlobalMutex.Lock()
+	C.SDL_SetModState(C.SDL_Keymod(modstate))
+	GlobalMutex.Unlock()
+}
 
 // Gets the name of an SDL virtual keysym
 func GetKeyName(key Key) string {
