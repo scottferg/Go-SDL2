@@ -378,18 +378,17 @@ func CreateWindow(title string, x, y int, h, w int, flags uint32) *Window {
 	return wrapWindow(window)
 }
 
-// TODO: Not working currently
 func CreateWindowAndRenderer(h, w int, flags uint32) (*Window, *Renderer) {
-	var win *Window
-	var rend *Renderer
+	var win Window
+	var rend Renderer
 
 	GlobalMutex.Lock()
 	defer GlobalMutex.Unlock()
 
 	C.SDL_CreateWindowAndRenderer(C.int(h), C.int(w), C.Uint32(flags),
-		(**C.SDL_Window)(cast(&win.cWindow)), (**C.SDL_Renderer)(cast(&rend.cRenderer)))
+		&win.cWindow, &rend.cRenderer)
 
-	return win, rend
+	return &win, &rend
 }
 
 func (w *Window) GetTitle() string {

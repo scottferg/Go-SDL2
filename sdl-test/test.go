@@ -49,16 +49,12 @@ func main() {
 		log.Fatal(sdl.GetError())
 	}
 
-	var window = sdl.CreateWindow("SDL2 Sample", sdl.WINDOWPOS_UNDEFINED,
-		sdl.WINDOWPOS_UNDEFINED, 640, 480, sdl.WINDOW_SHOWN)
+	window, rend := sdl.CreateWindowAndRenderer(640, 480, sdl.WINDOW_SHOWN)
 
 	if window == nil {
 		log.Println("nil window")
 		log.Fatal(sdl.GetError())
 	}
-
-	rend := sdl.CreateRenderer(window, -1,
-		sdl.RENDERER_ACCELERATED|sdl.RENDERER_PRESENTVSYNC)
 
 	if rend == nil {
 		log.Println("nil rend")
