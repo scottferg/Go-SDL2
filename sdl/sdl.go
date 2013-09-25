@@ -7,17 +7,18 @@ flavor (eg. Rather than sdl.Flip(surface) it's surface.Flip() )
 */
 package sdl
 
-// #cgo pkg-config: sdl SDL_image
+// #cgo pkg-config: sdl2 SDL2_image
 //
 // struct private_hwdata{};
 // struct SDL_BlitMap{};
 // #define map _map
 //
-// #include <SDL/SDL.h>
-// #include <SDL/SDL_image.h>
+// #include <SDL2/SDL.h>
+// #include <SDL2/SDL_image.h>
 import "C"
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"runtime"
@@ -48,12 +49,30 @@ type Surface struct {
 	H      int32
 	Pitch  uint16
 	Pixels unsafe.Pointer
-	Offset int32
 
 	gcPixels interface{} // Prevents garbage collection of pixels passed to func CreateRGBSurfaceFrom
 }
 
-func wrap(cSurface *C.SDL_Surface) *Surface {
+type Window struct {
+	cWindow *C.SDL_Window
+	mutex   sync.RWMutex
+
+	Flags uint32
+	X     int32
+	Y     int32
+	W     int32
+	H     int32
+}
+
+type Renderer struct {
+	cRenderer *C.SDL_Renderer
+}
+
+type Texture struct {
+	cTexture *C.SDL_Texture
+}
+
+func wrapSurface(cSurface *C.SDL_Surface) *Surface {
 	var s *Surface
 
 	if cSurface != nil {
@@ -67,10 +86,71 @@ func wrap(cSurface *C.SDL_Surface) *Surface {
 	return s
 }
 
+func wrapWindow(cWindow *C.SDL_Window) *Window {
+	var w *Window
+
+	if cWindow != nil {
+		var window Window
+		window.SetCWindow(unsafe.Pointer(cWindow))
+		w = &window
+	} else {
+		w = nil
+	}
+
+	return w
+}
+
+func wrapRenderer(cRenderer *C.SDL_Renderer) *Renderer {
+	var r *Renderer
+
+	if cRenderer != nil {
+		var renderer Renderer
+		renderer.cRenderer = (*C.SDL_Renderer)(unsafe.Pointer(cRenderer))
+		r = &renderer
+	} else {
+		r = nil
+	}
+
+	return r
+}
+
+func wrapTexture(cTexture *C.SDL_Texture) *Texture {
+	var t *Texture
+
+	if cTexture != nil {
+		var texture Texture
+		texture.cTexture = (*C.SDL_Texture)(unsafe.Pointer(cTexture))
+		t = &texture
+	} else {
+		t = nil
+	}
+
+	return t
+}
+
 // FIXME: Ideally, this should NOT be a public function, but it is needed in the package "ttf" ...
 func (s *Surface) SetCSurface(cSurface unsafe.Pointer) {
 	s.cSurface = (*C.SDL_Surface)(cSurface)
 	s.reload()
+}
+
+func (s *Window) SetCWindow(cWindow unsafe.Pointer) {
+	s.cWindow = (*C.SDL_Window)(cWindow)
+	s.reload()
+}
+
+// Pull data from C.SDL_Window.
+// Make sure to use this when the C surface might have been changed.
+//
+// TODO: Incomplete
+func (s *Window) reload() {
+	/*
+		s.Flags = uint32(s.cWindow.flags)
+		s.W = int32(s.cWindow.w)
+		s.H = int32(s.cWindow.h)
+		s.X = int32(s.cWindow.x)
+		s.Y = int32(s.cWindow.y)
+	*/
 }
 
 // Pull data from C.SDL_Surface.
@@ -82,7 +162,6 @@ func (s *Surface) reload() {
 	s.H = int32(s.cSurface.h)
 	s.Pitch = uint16(s.cSurface.pitch)
 	s.Pixels = s.cSurface.pixels
-	s.Offset = int32(s.cSurface.offset)
 }
 
 func (s *Surface) destroy() {
@@ -90,6 +169,83 @@ func (s *Surface) destroy() {
 	s.Format = nil
 	s.Pixels = nil
 	s.gcPixels = nil
+}
+
+// =======
+// Renderer
+// =======
+
+func CreateRenderer(w *Window, index int, flags uint32) *Renderer {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	renderer := C.SDL_CreateRenderer(w.cWindow, C.int(index), C.Uint32(flags))
+
+	return wrapRenderer(renderer)
+}
+
+func (r *Renderer) Clear() {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_RenderClear(r.cRenderer)
+}
+
+func (r *Renderer) Copy(t *Texture, src, dst *Rect) {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_RenderCopy(r.cRenderer, t.cTexture,
+		(*C.SDL_Rect)(cast(src)), (*C.SDL_Rect)(cast(dst)))
+}
+
+func (r *Renderer) Present() {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_RenderPresent(r.cRenderer)
+}
+
+func (r *Renderer) SetDrawColor(c Color) {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_SetRenderDrawColor(r.cRenderer, C.Uint8(c.R),
+		C.Uint8(c.G), C.Uint8(c.B), C.Uint8(c.Alpha))
+}
+
+func (r *Renderer) FillRect(rect *Rect) {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	fmt.Printf("null? %t\n", r.cRenderer == nil)
+	C.SDL_RenderFillRect(r.cRenderer, (*C.SDL_Rect)(cast(rect)))
+}
+
+func (r *Renderer) Destroy() {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_DestroyRenderer(r.cRenderer)
+}
+
+// =======
+// Texture
+// =======
+
+func CreateTextureFromSurface(r *Renderer, s *Surface) *Texture {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	texture := C.SDL_CreateTextureFromSurface(r.cRenderer, s.cSurface)
+	return wrapTexture(texture)
+}
+
+func (t *Texture) Destroy() {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_DestroyTexture(t.cTexture)
 }
 
 // =======
@@ -172,6 +328,13 @@ func WasInit(flags uint32) int {
 	return status
 }
 
+func NumDisplayModes(index int) int {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	return int(C.SDL_GetNumDisplayModes(C.int(index)))
+}
+
 // ==============
 // Error Handling
 // ==============
@@ -192,21 +355,71 @@ func ClearError() {
 }
 
 // ======
+// Window
+// ======
+
+func CreateWindow(title string, x, y int, h, w int, flags uint32) *Window {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	window := C.SDL_CreateWindow(C.CString(title), C.int(x), C.int(y),
+		C.int(h), C.int(w), C.Uint32(flags))
+
+	return wrapWindow(window)
+}
+
+// TODO: Not working currently
+func CreateWindowAndRenderer(h, w int, flags uint32) (*Window, *Renderer) {
+	var win *Window
+	var rend *Renderer
+
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_CreateWindowAndRenderer(C.int(h), C.int(w), C.Uint32(flags),
+		(**C.SDL_Window)(cast(&win.cWindow)), (**C.SDL_Renderer)(cast(&rend.cRenderer)))
+
+	return win, rend
+}
+
+func (w *Window) GetTitle() string {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	ctitle := C.SDL_GetWindowTitle(w.cWindow)
+
+	return C.GoString(ctitle)
+}
+
+func (w *Window) SetTitle(title string) {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	ctitle := C.CString(title)
+	C.SDL_SetWindowTitle(w.cWindow, ctitle)
+
+	C.free(unsafe.Pointer(ctitle))
+}
+
+func (w *Window) SetIcon(s *Surface) {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_SetWindowIcon(w.cWindow, s.cSurface)
+}
+
+func (w *Window) Destroy() {
+	GlobalMutex.Lock()
+	defer GlobalMutex.Unlock()
+
+	C.SDL_DestroyWindow(w.cWindow)
+}
+
+// ======
 // Video
 // ======
 
 var currentVideoSurface *Surface = nil
-
-// Sets up a video mode with the specified width, height, bits-per-pixel and
-// returns a corresponding surface.  You don't need to call the Free method
-// of the returned surface, as it will be done automatically by sdl.Quit.
-func SetVideoMode(w int, h int, bpp int, flags uint32) *Surface {
-	GlobalMutex.Lock()
-	var screen = C.SDL_SetVideoMode(C.int(w), C.int(h), C.int(bpp), C.Uint32(flags))
-	currentVideoSurface = wrap(screen)
-	GlobalMutex.Unlock()
-	return currentVideoSurface
-}
 
 // Returns a pointer to the current display surface.
 func GetVideoSurface() *Surface {
@@ -216,172 +429,10 @@ func GetVideoSurface() *Surface {
 	return surface
 }
 
-// Checks to see if a particular video mode is supported.  Returns 0 if not
-// supported, or the bits-per-pixel of the closest available mode.
-func VideoModeOK(width int, height int, bpp int, flags uint32) int {
-	GlobalMutex.Lock()
-	status := int(C.SDL_VideoModeOK(C.int(width), C.int(height), C.int(bpp), C.Uint32(flags)))
-	GlobalMutex.Unlock()
-	return status
-}
-
-// Returns the list of available screen dimensions for the given format.
-//
-// NOTE: The result of this function uses a different encoding than the underlying C function.
-// It returns an empty array if no modes are available,
-// and nil if any dimension is okay for the given format.
-func ListModes(format *PixelFormat, flags uint32) []Rect {
-	modes := C.SDL_ListModes((*C.SDL_PixelFormat)(cast(format)), C.Uint32(flags))
-
-	// No modes available
-	if modes == nil {
-		return make([]Rect, 0)
-	}
-
-	// (modes == -1) --> Any dimension is ok
-	if uintptr(unsafe.Pointer(modes))+1 == uintptr(0) {
-		return nil
-	}
-
-	count := 0
-	ptr := *modes //first element in the list
-	for ptr != nil {
-		count++
-		ptr = *(**C.SDL_Rect)(unsafe.Pointer(uintptr(unsafe.Pointer(modes)) + uintptr(count*int(unsafe.Sizeof(ptr)))))
-	}
-
-	ret := make([]Rect, count)
-	for i := 0; i < count; i++ {
-		ptr := (**C.SDL_Rect)(unsafe.Pointer(uintptr(unsafe.Pointer(modes)) + uintptr(i*int(unsafe.Sizeof(*modes)))))
-		var r *C.SDL_Rect = *ptr
-		ret[i].X = int16(r.x)
-		ret[i].Y = int16(r.y)
-		ret[i].W = uint16(r.w)
-		ret[i].H = uint16(r.h)
-	}
-
-	return ret
-}
-
-type VideoInfo struct {
-	HW_available bool         "Flag: Can you create hardware surfaces?"
-	WM_available bool         "Flag: Can you talk to a window manager?"
-	Blit_hw      bool         "Flag: Accelerated blits HW --> HW"
-	Blit_hw_CC   bool         "Flag: Accelerated blits with Colorkey"
-	Blit_hw_A    bool         "Flag: Accelerated blits with Alpha"
-	Blit_sw      bool         "Flag: Accelerated blits SW --> HW"
-	Blit_sw_CC   bool         "Flag: Accelerated blits with Colorkey"
-	Blit_sw_A    bool         "Flag: Accelerated blits with Alpha"
-	Blit_fill    bool         "Flag: Accelerated color fill"
-	Video_mem    uint32       "The total amount of video memory (in K)"
-	Vfmt         *PixelFormat "Value: The format of the video surface"
-	Current_w    int32        "Value: The current video mode width"
-	Current_h    int32        "Value: The current video mode height"
-}
-
-func GetVideoInfo() *VideoInfo {
-	GlobalMutex.Lock()
-	vinfo := (*internalVideoInfo)(cast(C.SDL_GetVideoInfo()))
-	GlobalMutex.Unlock()
-
-	flags := vinfo.Flags
-
-	return &VideoInfo{
-		HW_available: flags&(1<<0) != 0,
-		WM_available: flags&(1<<1) != 0,
-		Blit_hw:      flags&(1<<9) != 0,
-		Blit_hw_CC:   flags&(1<<10) != 0,
-		Blit_hw_A:    flags&(1<<11) != 0,
-		Blit_sw:      flags&(1<<12) != 0,
-		Blit_sw_CC:   flags&(1<<13) != 0,
-		Blit_sw_A:    flags&(1<<14) != 0,
-		Blit_fill:    flags&(1<<15) != 0,
-		Video_mem:    vinfo.Video_mem,
-		Vfmt:         vinfo.Vfmt,
-		Current_w:    vinfo.Current_w,
-		Current_h:    vinfo.Current_h,
-	}
-}
-
-// Makes sure the given area is updated on the given screen.  If x, y, w, and
-// h are all 0, the whole screen will be updated.
-func (screen *Surface) UpdateRect(x int32, y int32, w uint32, h uint32) {
-	GlobalMutex.Lock()
-	screen.mutex.Lock()
-
-	C.SDL_UpdateRect(screen.cSurface, C.Sint32(x), C.Sint32(y), C.Uint32(w), C.Uint32(h))
-
-	screen.mutex.Unlock()
-	GlobalMutex.Unlock()
-}
-
-func (screen *Surface) UpdateRects(rects []Rect) {
-	if len(rects) > 0 {
-		GlobalMutex.Lock()
-		screen.mutex.Lock()
-
-		C.SDL_UpdateRects(screen.cSurface, C.int(len(rects)), (*C.SDL_Rect)(cast(&rects[0])))
-
-		screen.mutex.Unlock()
-		GlobalMutex.Unlock()
-	}
-}
-
-// Gets the window title and icon name.
-func WM_GetCaption() (title, icon string) {
-	GlobalMutex.Lock()
-
-	// SDL seems to free these strings.  TODO: Check to see if that's the case
-	var ctitle, cicon *C.char
-	C.SDL_WM_GetCaption(&ctitle, &cicon)
-	title = C.GoString(ctitle)
-	icon = C.GoString(cicon)
-
-	GlobalMutex.Unlock()
-
-	return
-}
-
-// Sets the window title and icon name.
-func WM_SetCaption(title, icon string) {
-	ctitle := C.CString(title)
-	cicon := C.CString(icon)
-
-	GlobalMutex.Lock()
-	C.SDL_WM_SetCaption(ctitle, cicon)
-	GlobalMutex.Unlock()
-
-	C.free(unsafe.Pointer(ctitle))
-	C.free(unsafe.Pointer(cicon))
-}
-
-// Sets the icon for the display window.
-func WM_SetIcon(icon *Surface, mask *uint8) {
-	GlobalMutex.Lock()
-	C.SDL_WM_SetIcon(icon.cSurface, (*C.Uint8)(mask))
-	GlobalMutex.Unlock()
-}
-
-// Minimizes the window
-func WM_IconifyWindow() int {
-	GlobalMutex.Lock()
-	status := int(C.SDL_WM_IconifyWindow())
-	GlobalMutex.Unlock()
-	return status
-}
-
-// Toggles fullscreen mode
-func WM_ToggleFullScreen(surface *Surface) int {
-	GlobalMutex.Lock()
-	status := int(C.SDL_WM_ToggleFullScreen(surface.cSurface))
-	GlobalMutex.Unlock()
-	return status
-}
-
 // Swaps OpenGL framebuffers/Update Display.
-func GL_SwapBuffers() {
+func (w *Window) GL_SwapWindow() {
 	GlobalMutex.Lock()
-	C.SDL_GL_SwapBuffers()
+	C.SDL_GL_SwapWindow(w.cWindow)
 	GlobalMutex.Unlock()
 }
 
@@ -389,19 +440,6 @@ func GL_SetAttribute(attr int, value int) int {
 	GlobalMutex.Lock()
 	status := int(C.SDL_GL_SetAttribute(C.SDL_GLattr(attr), C.int(value)))
 	GlobalMutex.Unlock()
-	return status
-}
-
-// Swaps screen buffers.
-func (screen *Surface) Flip() int {
-	GlobalMutex.Lock()
-	screen.mutex.Lock()
-
-	status := int(C.SDL_Flip(screen.cSurface))
-
-	screen.mutex.Unlock()
-	GlobalMutex.Unlock()
-
 	return status
 }
 
@@ -490,19 +528,11 @@ func (dst *Surface) FillRect(dstrect *Rect, color uint32) int {
 	return int(ret)
 }
 
-// Adjusts the alpha properties of a Surface.
-func (s *Surface) SetAlpha(flags uint32, alpha uint8) int {
-	s.mutex.Lock()
-	status := int(C.SDL_SetAlpha(s.cSurface, C.Uint32(flags), C.Uint8(alpha)))
-	s.mutex.Unlock()
-	return status
-}
-
 // Sets the color key (transparent pixel)  in  a  blittable  surface  and
 // enables or disables RLE blit acceleration.
 func (s *Surface) SetColorKey(flags uint32, ColorKey uint32) int {
 	s.mutex.Lock()
-	status := int(C.SDL_SetColorKey(s.cSurface, C.Uint32(flags), C.Uint32(ColorKey)))
+	status := int(C.SDL_SetColorKey(s.cSurface, C.int(flags), C.Uint32(ColorKey)))
 	s.mutex.Unlock()
 	return status
 }
@@ -541,7 +571,7 @@ func Load(file string) *Surface {
 
 	GlobalMutex.Unlock()
 
-	return wrap(screen)
+	return wrapSurface(screen)
 }
 
 // Creates an empty Surface.
@@ -553,7 +583,7 @@ func CreateRGBSurface(flags uint32, width int, height int, bpp int, Rmask uint32
 
 	GlobalMutex.Unlock()
 
-	return wrap(p)
+	return wrapSurface(p)
 }
 
 // Creates a Surface from existing pixel data. It expects pixels to be a slice, pointer or unsafe.Pointer.
@@ -571,101 +601,18 @@ func CreateRGBSurfaceFrom(pixels interface{}, width, height, bpp, pitch int, Rma
 		C.Uint32(Rmask), C.Uint32(Gmask), C.Uint32(Bmask), C.Uint32(Amask))
 	GlobalMutex.Unlock()
 
-	s := wrap(p)
+	s := wrapSurface(p)
 	s.gcPixels = pixels
 	return s
 }
 
-// Converts a surface to the display format
-func (s *Surface) DisplayFormat() *Surface {
-	s.mutex.RLock()
-	p := C.SDL_DisplayFormat(s.cSurface)
-	s.mutex.RUnlock()
-	return wrap(p)
-}
-
-// Converts a surface to the display format with alpha
-func (s *Surface) DisplayFormatAlpha() *Surface {
-	s.mutex.RLock()
-	p := C.SDL_DisplayFormatAlpha(s.cSurface)
-	s.mutex.RUnlock()
-	return wrap(p)
-}
-
-// ========
-// Keyboard
-// ========
-
-// Enables UNICODE translation.
-func EnableUNICODE(enable int) int {
-	GlobalMutex.Lock()
-	previous := int(C.SDL_EnableUNICODE(C.int(enable)))
-	GlobalMutex.Unlock()
-	return previous
-}
-
-// Sets keyboard repeat rate.
-func EnableKeyRepeat(delay, interval int) int {
-	GlobalMutex.Lock()
-	status := int(C.SDL_EnableKeyRepeat(C.int(delay), C.int(interval)))
-	GlobalMutex.Unlock()
-	return status
-}
-
-// Gets keyboard repeat rate.
-func GetKeyRepeat() (int, int) {
-	var delay int
-	var interval int
-
-	GlobalMutex.Lock()
-	C.SDL_GetKeyRepeat((*C.int)(cast(&delay)), (*C.int)(cast(&interval)))
-	GlobalMutex.Unlock()
-
-	return delay, interval
-}
-
-// Gets a snapshot of the current keyboard state
-func GetKeyState() []uint8 {
-	GlobalMutex.Lock()
-
-	var numkeys C.int
-	array := C.SDL_GetKeyState(&numkeys)
-
-	var ptr = make([]uint8, numkeys)
-
-	*((**C.Uint8)(unsafe.Pointer(&ptr))) = array // TODO
-
-	GlobalMutex.Unlock()
-
-	return ptr
-
-}
-
-// Modifier
-type Mod C.int
-
 // Key
 type Key C.int
-
-// Gets the state of modifier keys
-func GetModState() Mod {
-	GlobalMutex.Lock()
-	state := Mod(C.SDL_GetModState())
-	GlobalMutex.Unlock()
-	return state
-}
-
-// Sets the state of modifier keys
-func SetModState(modstate Mod) {
-	GlobalMutex.Lock()
-	C.SDL_SetModState(C.SDLMod(modstate))
-	GlobalMutex.Unlock()
-}
 
 // Gets the name of an SDL virtual keysym
 func GetKeyName(key Key) string {
 	GlobalMutex.Lock()
-	name := C.GoString(C.SDL_GetKeyName(C.SDLKey(key)))
+	name := C.GoString(C.SDL_GetKeyName(C.SDL_Keycode(key)))
 	GlobalMutex.Unlock()
 	return name
 }
@@ -679,12 +626,6 @@ func (event *Event) poll() bool {
 	GlobalMutex.Lock()
 
 	var ret = C.SDL_PollEvent((*C.SDL_Event)(cast(event)))
-
-	if ret != 0 {
-		if (event.Type == VIDEORESIZE) && (currentVideoSurface != nil) {
-			currentVideoSurface.reload()
-		}
-	}
 
 	GlobalMutex.Unlock()
 
@@ -748,16 +689,6 @@ func NumJoysticks() int {
 	return num
 }
 
-// Get the implementation dependent name of a joystick.
-// This can be called before any joysticks are opened.
-// If no name can be found, this function returns NULL.
-func JoystickName(deviceIndex int) string {
-	GlobalMutex.Lock()
-	name := C.GoString(C.SDL_JoystickName(C.int(deviceIndex)))
-	GlobalMutex.Unlock()
-	return name
-}
-
 // Open a joystick for use The index passed as an argument refers to
 // the N'th joystick on the system. This index is the value which will
 // identify this joystick in future joystick events.  This function
@@ -767,14 +698,6 @@ func JoystickOpen(deviceIndex int) *Joystick {
 	joystick := C.SDL_JoystickOpen(C.int(deviceIndex))
 	GlobalMutex.Unlock()
 	return wrapJoystick(joystick)
-}
-
-// Returns 1 if the joystick has been opened, or 0 if it has not.
-func JoystickOpened(deviceIndex int) int {
-	GlobalMutex.Lock()
-	opened := int(C.SDL_JoystickOpened(C.int(deviceIndex)))
-	GlobalMutex.Unlock()
-	return opened
 }
 
 // Update the current state of the open joysticks. This is called
@@ -806,11 +729,6 @@ func (joystick *Joystick) Close() {
 // Get the number of general axis controls on a joystick
 func (joystick *Joystick) NumAxes() int {
 	return int(C.SDL_JoystickNumAxes(joystick.cJoystick))
-}
-
-// Get the device index of an opened joystick.
-func (joystick *Joystick) Index() int {
-	return int(C.SDL_JoystickIndex(joystick.cJoystick))
 }
 
 // Get the number of buttons on a joystick

@@ -47,12 +47,6 @@ func pollEvents() {
 
 			case JOYBALLMOTION:
 				events <- *(*JoyBallEvent)(cast(event))
-
-			case ACTIVEEVENT:
-				events <- *(*ActiveEvent)(cast(event))
-
-			case VIDEORESIZE:
-				events <- *(*ResizeEvent)(cast(event))
 			}
 		}
 

@@ -33,6 +33,7 @@ type Color struct {
 	R      uint8
 	G      uint8
 	B      uint8
+	Alpha  uint8
 	Unused uint8
 }
 
@@ -63,13 +64,13 @@ type Overlay struct {
 }
 
 type ActiveEvent struct {
-	Type  uint8
+	Type  uint32
 	Gain  uint8
 	State uint8
 }
 
 type KeyboardEvent struct {
-	Type   uint8
+	Type   uint32
 	Which  uint8
 	State  uint8
 	Pad0   [1]byte
@@ -77,7 +78,7 @@ type KeyboardEvent struct {
 }
 
 type MouseMotionEvent struct {
-	Type  uint8
+	Type  uint32
 	Which uint8
 	State uint8
 	Pad0  [1]byte
@@ -88,7 +89,7 @@ type MouseMotionEvent struct {
 }
 
 type MouseButtonEvent struct {
-	Type   uint8
+	Type   uint32
 	Which  uint8
 	Button uint8
 	State  uint8
@@ -97,7 +98,7 @@ type MouseButtonEvent struct {
 }
 
 type JoyAxisEvent struct {
-	Type  uint8
+	Type  uint32
 	Which uint8
 	Axis  uint8
 	Pad0  [1]byte
@@ -105,7 +106,7 @@ type JoyAxisEvent struct {
 }
 
 type JoyBallEvent struct {
-	Type  uint8
+	Type  uint32
 	Which uint8
 	Ball  uint8
 	Pad0  [1]byte
@@ -114,36 +115,36 @@ type JoyBallEvent struct {
 }
 
 type JoyHatEvent struct {
-	Type  uint8
+	Type  uint32
 	Which uint8
 	Hat   uint8
 	Value uint8
 }
 
 type JoyButtonEvent struct {
-	Type   uint8
+	Type   uint32
 	Which  uint8
 	Button uint8
 	State  uint8
 }
 
 type ResizeEvent struct {
-	Type uint8
+	Type uint32
 	Pad0 [3]byte
 	W    int32
 	H    int32
 }
 
 type ExposeEvent struct {
-	Type uint8
+	Type uint32
 }
 
 type QuitEvent struct {
-	Type uint8
+	Type uint32
 }
 
 type UserEvent struct {
-	Type  uint8
+	Type  uint32
 	Pad0  [3]byte
 	Code  int32
 	Data1 *byte
@@ -153,14 +154,14 @@ type UserEvent struct {
 type SysWMmsg struct{}
 
 type SysWMEvent struct {
-	Type uint8
+	Type uint32
 	Pad0 [7]byte
 	Msg  *SysWMmsg
 }
 
 type Event struct {
-	Type uint8
-	Pad0 [23]byte
+	Type uint32
+	Pad0 [31]byte
 }
 
 type Keysym struct {
