@@ -33,6 +33,7 @@ type Color struct {
 	R      uint8
 	G      uint8
 	B      uint8
+	Alpha  uint8
 	Unused uint8
 }
 
@@ -68,15 +69,17 @@ type ActiveEvent struct {
 }
 
 type KeyboardEvent struct {
-	Type   uint8
-	Which  uint8
-	State  uint8
-	Pad0   [1]byte
-	Keysym Keysym
+	Type      uint32
+	Timestamp uint32
+	WindowId  uint32
+	State     uint8
+	Repeat    uint8
+	Pad0      [2]byte
+	Keysym    Keysym
 }
 
 type MouseMotionEvent struct {
-	Type  uint8
+	Type  uint32
 	Which uint8
 	State uint8
 	Pad0  [1]byte
@@ -87,7 +90,7 @@ type MouseMotionEvent struct {
 }
 
 type MouseButtonEvent struct {
-	Type   uint8
+	Type   uint32
 	Which  uint8
 	Button uint8
 	State  uint8
@@ -158,8 +161,8 @@ type SysWMEvent struct {
 }
 
 type Event struct {
-	Type uint8
-	Pad0 [19]byte
+	Type uint32
+	Pad0 [31]byte
 }
 
 type Keysym struct {
