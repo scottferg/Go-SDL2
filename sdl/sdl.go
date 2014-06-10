@@ -18,7 +18,6 @@ package sdl
 import "C"
 
 import (
-	"fmt"
 	"os"
 	"reflect"
 	"runtime"
@@ -222,7 +221,6 @@ func (r *Renderer) FillRect(rect *Rect) {
 	GlobalMutex.Lock()
 	defer GlobalMutex.Unlock()
 
-	fmt.Printf("null? %t\n", r.cRenderer == nil)
 	C.SDL_RenderFillRect(r.cRenderer, (*C.SDL_Rect)(cast(rect)))
 }
 
